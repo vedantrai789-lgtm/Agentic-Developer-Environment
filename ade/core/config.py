@@ -21,8 +21,13 @@ class Settings(BaseSettings):
     # Redis
     redis_url: str = "redis://localhost:6379/0"
 
-    # Optional embeddings
+    # Embeddings
+    openai_api_key: str | None = None
     voyage_api_key: str | None = None
+    embedding_provider: str = "openai"  # "openai" or "voyage"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_batch_size: int = 128
+    embedding_dimension: int = 1536
 
     # Model configuration
     default_codegen_model: str = "claude-sonnet-4-20250514"
@@ -30,6 +35,12 @@ class Settings(BaseSettings):
 
     # LLM cache
     llm_cache_ttl_seconds: int = 3600
+
+    # RAG
+    rag_max_file_size: int = 100_000
+    rag_chunk_max_tokens: int = 500
+    rag_retrieval_k: int = 10
+    rag_rerank_top_n: int = 5
 
     # Sandbox
     sandbox_docker_image: str = "python:3.12-slim"
