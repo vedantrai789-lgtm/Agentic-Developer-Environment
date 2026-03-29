@@ -37,11 +37,12 @@ async def test_executor_node_returns_result():
         error="",
     )
 
-    # Mock DB calls
+    # Mock DB calls and force MockExecutor
     from unittest.mock import AsyncMock, patch
 
     with (
         patch("ade.agents.executor._get_step_id", new_callable=AsyncMock, return_value=None),
+        patch("ade.agents.executor.get_executor", return_value=MockExecutor()),
     ):
         result = await executor_node(state)
 

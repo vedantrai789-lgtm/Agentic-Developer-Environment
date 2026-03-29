@@ -26,6 +26,7 @@ dependencies = [
     "pathspec>=0.12,<1",
     "tiktoken>=0.8,<1",
     "openai>=1.60,<2",
+    "docker>=7.0,<8",
 ]
 
 [project.optional-dependencies]

@@ -20,7 +20,7 @@ class ExecutorBackend(ABC):
 
 
 class MockExecutor(ExecutorBackend):
-    """Always-pass executor for Phase 3. Replaced by DockerExecutor in Phase 4."""
+    """Always-pass executor for testing. Returns exit_code=0."""
 
     async def run(
         self, command: str, workdir: str, timeout: int = 60
@@ -35,11 +35,32 @@ class MockExecutor(ExecutorBackend):
 
 
 def get_executor() -> ExecutorBackend:
-    """Get or create the executor backend singleton."""
+    """Get or create the executor backend singleton.
+
+    Uses settings.sandbox_backend to choose between 'docker' and 'mock'.
+    Falls back to MockExecutor if Docker is unavailable.
+    """
     global _executor_instance
     if _executor_instance is None:
-        _executor_instance = MockExecutor()
+        try:
+            from ade.core.config import get_settings
+
+            settings = get_settings()
+            if settings.sandbox_backend == "docker":
+                from ade.sandbox.docker_manager import DockerExecutor
+
+                _executor_instance = DockerExecutor()
+            else:
+                _executor_instance = MockExecutor()
+        except Exception:
+            _executor_instance = MockExecutor()
     return _executor_instance
+
+
+def reset_executor() -> None:
+    """Reset the singleton (useful for testing)."""
+    global _executor_instance
+    _executor_instance = None
 
 
 async def executor_node(state: AgentState) -> dict:
@@ -49,16 +70,30 @@ async def executor_node(state: AgentState) -> dict:
         plan = state.get("plan", [])
         step_index = state.get("current_step_index", 0)
         project_path = state.get("project_path", "")
+        code_changes = state.get("code_changes", [])
 
         # Determine test command
         command = _determine_command(plan, step_index)
 
-        # Run
         executor = get_executor()
-        result = await executor.run(
-            command=command,
-            workdir=project_path,
-        )
+
+        # If using Docker, prepare a sandbox workspace with code changes applied
+        from ade.sandbox.docker_manager import DockerExecutor
+
+        if isinstance(executor, DockerExecutor) and code_changes:
+            from ade.sandbox.workspace import SandboxWorkspace
+
+            async with SandboxWorkspace(project_path) as ws:
+                workspace_dir = await ws.prepare(code_changes)
+                result = await executor.run(
+                    command=command,
+                    workdir=str(workspace_dir),
+                )
+        else:
+            result = await executor.run(
+                command=command,
+                workdir=project_path,
+            )
 
         # Persist to DB
         current_step = plan[step_index] if step_index < len(plan) else None

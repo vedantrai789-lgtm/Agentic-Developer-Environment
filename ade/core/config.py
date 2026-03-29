@@ -43,9 +43,12 @@ class Settings(BaseSettings):
     rag_rerank_top_n: int = 5
 
     # Sandbox
-    sandbox_docker_image: str = "python:3.12-slim"
+    sandbox_backend: str = "docker"  # "docker" or "mock"
+    sandbox_docker_image: str = "ade-sandbox:latest"
     sandbox_timeout_seconds: int = 60
     sandbox_memory_limit: str = "512m"
+    sandbox_cpu_limit: float = 1.0
+    sandbox_network_disabled: bool = True
 
     @field_validator("database_url")
     @classmethod

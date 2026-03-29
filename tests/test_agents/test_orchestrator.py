@@ -127,6 +127,8 @@ async def test_run_task_happy_path():
 
     mock_complete = AsyncMock(return_value={"status": "complete"})
 
+    from ade.agents.executor import MockExecutor
+
     with (
         patch("ade.agents.planner.get_llm", return_value=mock_llm),
         patch("ade.agents.planner._get_context", new_callable=AsyncMock, return_value=[]),
@@ -134,6 +136,7 @@ async def test_run_task_happy_path():
         patch("ade.agents.codegen.get_llm", return_value=mock_llm),
         patch("ade.agents.codegen._get_step_id", new_callable=AsyncMock, return_value=None),
         patch("ade.agents.executor._get_step_id", new_callable=AsyncMock, return_value=None),
+        patch("ade.agents.executor.get_executor", return_value=MockExecutor()),
         patch("ade.agents.orchestrator.mark_complete", mock_complete),
     ):
         final = await run_task(
