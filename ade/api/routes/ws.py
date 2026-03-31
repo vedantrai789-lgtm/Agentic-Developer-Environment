@@ -24,11 +24,15 @@ async def task_websocket(websocket: WebSocket, task_id: str) -> None:
 
         try:
             while True:
-                # Poll for messages with a timeout for heartbeat
-                message = await asyncio.wait_for(
-                    pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
-                    timeout=HEARTBEAT_INTERVAL,
-                )
+                try:
+                    message = await asyncio.wait_for(
+                        pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0),
+                        timeout=HEARTBEAT_INTERVAL,
+                    )
+                except asyncio.TimeoutError:
+                    # No message in HEARTBEAT_INTERVAL seconds — send ping
+                    await websocket.send_text(json.dumps({"event_type": "ping"}))
+                    continue
 
                 if message and message["type"] == "message":
                     data = message["data"]
@@ -41,10 +45,6 @@ async def task_websocket(websocket: WebSocket, task_id: str) -> None:
                             break
                     except (json.JSONDecodeError, KeyError):
                         pass
-
-        except asyncio.TimeoutError:
-            # Send heartbeat ping
-            await websocket.send_text(json.dumps({"event_type": "ping"}))
 
         finally:
             await pubsub.unsubscribe(channel)
