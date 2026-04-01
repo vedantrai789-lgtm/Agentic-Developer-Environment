@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-import sys
+import logging
 
 from ade.api.events import publish_task_event
+
+logger = logging.getLogger(__name__)
 
 # Track running tasks for potential cancellation
 _running_tasks: dict[str, asyncio.Task] = {}
@@ -40,7 +42,7 @@ async def execute_task_in_background(
             )
 
     except Exception as e:
-        print(f"Background task {task_id} failed: {e}", file=sys.stderr)
+        logger.exception("Background task %s failed: %s", task_id, e)
         await publish_task_event(
             task_id, "task_failed", {"status": "failed", "error": str(e)}
         )

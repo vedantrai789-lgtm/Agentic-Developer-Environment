@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
 import shutil
 import tempfile
 from pathlib import Path
 
 from ade.agents.state import CodeChangeDict
+
+logger = logging.getLogger(__name__)
 
 
 class SandboxWorkspace:
@@ -140,3 +143,37 @@ def _patch_lines(original: list[str], diff: str) -> list[str]:
             i += 1
 
     return result
+
+
+def apply_changes_to_project(
+    project_path: str, code_changes: list[CodeChangeDict]
+) -> list[str]:
+    """Apply code changes to the real project directory.
+
+    Creates backups of modified files in .ade-backup/ before overwriting.
+    Returns the list of file paths that were modified.
+    """
+    root = Path(project_path)
+    backup_dir = root / ".ade-backup"
+    modified: list[str] = []
+
+    for change in code_changes:
+        file_path = root / change["file_path"]
+
+        # Back up existing files before modifying
+        if file_path.exists() and change["change_type"] != "create":
+            backup_dir.mkdir(parents=True, exist_ok=True)
+            backup_dest = backup_dir / change["file_path"]
+            backup_dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(file_path, backup_dest)
+            logger.info("Backed up %s -> %s", file_path, backup_dest)
+
+        modified.append(change["file_path"])
+
+    # Reuse the existing apply logic
+    _apply_changes(root, code_changes)
+
+    logger.info(
+        "Applied %d changes to project at %s", len(code_changes), project_path
+    )
+    return modified

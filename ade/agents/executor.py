@@ -1,10 +1,14 @@
-import sys
+import asyncio
+import logging
+import time
 import uuid
 from abc import ABC, abstractmethod
 
 from ade.agents.state import AgentState, ExecutionResultDict
 from ade.core.database import async_session_factory
 from ade.core.models import ExecutionResult, PlanStep, StepStatus
+
+logger = logging.getLogger(__name__)
 
 _executor_instance: "ExecutorBackend | None" = None
 
@@ -34,11 +38,58 @@ class MockExecutor(ExecutorBackend):
         )
 
 
+class SubprocessExecutor(ExecutorBackend):
+    """Execute commands via local subprocess (no Docker isolation)."""
+
+    async def run(
+        self, command: str, workdir: str, timeout: int = 60
+    ) -> ExecutionResultDict:
+        start = time.monotonic()
+        try:
+            proc = await asyncio.create_subprocess_shell(
+                command,
+                cwd=workdir,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(), timeout=timeout
+            )
+            duration_ms = int((time.monotonic() - start) * 1000)
+
+            return ExecutionResultDict(
+                command=command,
+                exit_code=proc.returncode or 0,
+                stdout=stdout_bytes.decode("utf-8", errors="replace")[:50_000],
+                stderr=stderr_bytes.decode("utf-8", errors="replace")[:50_000],
+                duration_ms=duration_ms,
+            )
+
+        except asyncio.TimeoutError:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return ExecutionResultDict(
+                command=command,
+                exit_code=1,
+                stdout="",
+                stderr=f"Command timed out after {timeout}s",
+                duration_ms=duration_ms,
+            )
+        except Exception as e:
+            duration_ms = int((time.monotonic() - start) * 1000)
+            return ExecutionResultDict(
+                command=command,
+                exit_code=1,
+                stdout="",
+                stderr=str(e),
+                duration_ms=duration_ms,
+            )
+
+
 def get_executor() -> ExecutorBackend:
     """Get or create the executor backend singleton.
 
-    Uses settings.sandbox_backend to choose between 'docker' and 'mock'.
-    Falls back to MockExecutor if Docker is unavailable.
+    Uses settings.sandbox_backend to choose: 'docker', 'subprocess', or 'mock'.
+    Falls back gracefully with logging.
     """
     global _executor_instance
     if _executor_instance is None:
@@ -46,13 +97,28 @@ def get_executor() -> ExecutorBackend:
             from ade.core.config import get_settings
 
             settings = get_settings()
-            if settings.sandbox_backend == "docker":
-                from ade.sandbox.docker_manager import DockerExecutor
+            backend = settings.sandbox_backend
 
-                _executor_instance = DockerExecutor()
+            if backend == "docker":
+                try:
+                    from ade.sandbox.docker_manager import DockerExecutor
+
+                    _executor_instance = DockerExecutor()
+                    logger.info("Using Docker executor")
+                except Exception as e:
+                    logger.warning("Docker unavailable, falling back to subprocess: %s", e)
+                    _executor_instance = SubprocessExecutor()
+
+            elif backend == "subprocess":
+                _executor_instance = SubprocessExecutor()
+                logger.info("Using subprocess executor")
+
             else:
                 _executor_instance = MockExecutor()
-        except Exception:
+                logger.info("Using mock executor")
+
+        except Exception as e:
+            logger.warning("Failed to initialize executor, using mock: %s", e)
             _executor_instance = MockExecutor()
     return _executor_instance
 
@@ -108,7 +174,7 @@ async def executor_node(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        print(f"Executor error: {e}", file=sys.stderr)
+        logger.exception("Executor error: %s", e)
         return {
             "execution_results": [ExecutionResultDict(
                 command="unknown",

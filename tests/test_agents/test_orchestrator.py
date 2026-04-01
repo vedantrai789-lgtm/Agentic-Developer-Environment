@@ -32,13 +32,13 @@ def test_route_after_executor_pass_more_steps():
 
 
 def test_route_after_executor_pass_done():
-    """Should route to 'complete' when tests pass and all steps done."""
+    """Should route to 'apply' when tests pass and all steps done."""
     state = AgentState(
         execution_results=[PASS_RESULT],
         current_step_index=1,
         plan=[{"step_number": 1}, {"step_number": 2}],
     )
-    assert route_after_executor(state) == "complete"
+    assert route_after_executor(state) == "apply"
 
 
 def test_route_after_executor_fail_retry():
@@ -129,14 +129,18 @@ async def test_run_task_happy_path():
 
     from ade.agents.executor import MockExecutor
 
+    mock_apply = AsyncMock(return_value={"status": "complete"})
+
     with (
         patch("ade.agents.planner.get_llm", return_value=mock_llm),
         patch("ade.agents.planner._get_context", new_callable=AsyncMock, return_value=[]),
         patch("ade.agents.planner._persist_plan", new_callable=AsyncMock),
+        patch("ade.agents.planner._get_file_tree", return_value=""),
         patch("ade.agents.codegen.get_llm", return_value=mock_llm),
         patch("ade.agents.codegen._get_step_id", new_callable=AsyncMock, return_value=None),
         patch("ade.agents.executor._get_step_id", new_callable=AsyncMock, return_value=None),
         patch("ade.agents.executor.get_executor", return_value=MockExecutor()),
+        patch("ade.agents.orchestrator.apply_changes", mock_apply),
         patch("ade.agents.orchestrator.mark_complete", mock_complete),
     ):
         final = await run_task(

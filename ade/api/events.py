@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import json
-import sys
+import logging
 from datetime import datetime, timezone
+
+logger = logging.getLogger(__name__)
 
 
 async def publish_task_event(
@@ -23,4 +25,4 @@ async def publish_task_event(
         }
         await redis.publish(f"task:{task_id}:events", json.dumps(event))
     except Exception as e:
-        print(f"Failed to publish task event: {e}", file=sys.stderr)
+        logger.warning("Failed to publish task event: %s", e)

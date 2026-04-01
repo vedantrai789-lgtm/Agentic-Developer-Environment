@@ -1,5 +1,5 @@
+import logging
 import os
-import sys
 import uuid
 from pathlib import Path
 
@@ -10,6 +10,8 @@ from ade.agents.state import AgentState
 from ade.core.database import async_session_factory
 from ade.core.llm import get_llm
 from ade.core.models import CodeChange, PlanStep, StepStatus
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "codegen_system.txt").read_text()
 
@@ -64,7 +66,7 @@ async def codegen_node(state: AgentState) -> dict:
         }
 
     except Exception as e:
-        print(f"Codegen error: {e}", file=sys.stderr)
+        logger.exception("Codegen error: %s", e)
         return {"status": "failed", "error": f"Codegen error: {e}"}
 
 
