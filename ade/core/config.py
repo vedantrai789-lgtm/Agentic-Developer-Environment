@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     embedding_provider: str = "openai"  # "openai" or "voyage"
     embedding_model: str = "text-embedding-3-small"
     embedding_batch_size: int = 128
-    embedding_dimension: int = 1536
+    embedding_dimension: int = 1024
 
     # Model configuration
     default_codegen_model: str = "claude-sonnet-4-20250514"

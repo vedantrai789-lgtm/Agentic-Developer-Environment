@@ -44,6 +44,8 @@ async def create_task(
     )
     session.add(task)
     await session.flush()
+    # Commit now so the background task can see the row
+    await session.commit()
 
     # Launch orchestrator in background
     launch_task(
@@ -53,6 +55,8 @@ async def create_task(
         project_path=project.path,
     )
 
+    # Refresh to get the committed state for the response
+    await session.refresh(task)
     return task
 
 

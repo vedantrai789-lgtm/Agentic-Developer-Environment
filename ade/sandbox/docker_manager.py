@@ -54,15 +54,21 @@ class DockerExecutor(ExecutorBackend):
         try:
             container_kwargs = self.policy.to_container_kwargs()
 
-            container = client.containers.run(
+            # Only use 'sandbox' user with the custom ade-sandbox image
+            user = "sandbox" if "ade-sandbox" in self.image else None
+
+            run_kwargs = dict(
                 image=self.image,
                 command=["bash", "-c", command],
                 volumes={workdir: {"bind": "/workspace", "mode": "rw"}},
                 working_dir="/workspace",
-                user="sandbox",
                 detach=True,
                 **container_kwargs,
             )
+            if user:
+                run_kwargs["user"] = user
+
+            container = client.containers.run(**run_kwargs)
 
             # Wait for completion with timeout
             result = container.wait(timeout=timeout)

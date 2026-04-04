@@ -41,7 +41,7 @@ def upgrade() -> None:
     sa.Column('chunk_type', sa.String(length=50), nullable=False),
     sa.Column('start_line', sa.Integer(), nullable=False),
     sa.Column('end_line', sa.Integer(), nullable=False),
-    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=1536), nullable=False),
+    sa.Column('embedding', pgvector.sqlalchemy.vector.VECTOR(dim=1024), nullable=False),
     sa.Column('last_modified', sa.DateTime(timezone=True), nullable=False),
     sa.ForeignKeyConstraint(['project_id'], ['projects.id'], ),
     sa.PrimaryKeyConstraint('chunk_id')

@@ -196,7 +196,7 @@ class Embedding(Base):
     chunk_type: Mapped[str] = mapped_column(String(50), nullable=False)
     start_line: Mapped[int] = mapped_column(Integer, nullable=False)
     end_line: Mapped[int] = mapped_column(Integer, nullable=False)
-    embedding = mapped_column(Vector(1536), nullable=False)
+    embedding = mapped_column(Vector(1024), nullable=False)
     last_modified: Mapped[datetime] = mapped_column(nullable=False)
 
     project: Mapped["Project"] = relationship(back_populates="embeddings")

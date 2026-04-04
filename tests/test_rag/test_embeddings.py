@@ -86,4 +86,4 @@ def test_embedder_dimension(test_settings):
     """Embedder dimension should match settings."""
     with patch("openai.AsyncOpenAI"):
         embedder = OpenAIEmbedder(test_settings)
-        assert embedder.dimension == 1536
+        assert embedder.dimension == 1024

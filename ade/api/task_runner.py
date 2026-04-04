@@ -21,6 +21,7 @@ async def execute_task_in_background(
 ) -> None:
     """Run the agent orchestrator and publish lifecycle events."""
     try:
+        logger.info("Starting background task %s: %s", task_id, description)
         await publish_task_event(task_id, "status_change", {"status": "planning"})
 
         from ade.agents.orchestrator import run_task

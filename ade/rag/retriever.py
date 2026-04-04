@@ -32,10 +32,10 @@ async def retrieve(
 
     sql = text("""
         SELECT chunk_id, file_path, chunk_text, chunk_type, start_line, end_line,
-               1 - (embedding <=> :query_vec::vector) AS score
+               1 - (embedding <=> cast(:query_vec AS vector)) AS score
         FROM embeddings
-        WHERE project_id = :project_id
-        ORDER BY embedding <=> :query_vec::vector
+        WHERE project_id = cast(:project_id AS uuid)
+        ORDER BY embedding <=> cast(:query_vec AS vector)
         LIMIT :k
     """)
 

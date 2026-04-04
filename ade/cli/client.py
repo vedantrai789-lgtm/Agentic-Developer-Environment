@@ -8,7 +8,7 @@ import httpx
 
 
 def get_base_url() -> str:
-    return os.environ.get("ADE_API_URL", "http://localhost:8000")
+    return os.environ.get("ADE_API_URL", "http://127.0.0.1:8000")
 
 
 class ADEClient:

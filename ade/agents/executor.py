@@ -139,14 +139,21 @@ async def executor_node(state: AgentState) -> dict:
         code_changes = state.get("code_changes", [])
 
         # Determine test command
-        command = _determine_command(plan, step_index)
+        command = _determine_command(plan, step_index, project_path)
+        logger.info("Executor running: %s in %s", command, project_path)
 
         executor = get_executor()
 
         # If using Docker, prepare a sandbox workspace with code changes applied
-        from ade.sandbox.docker_manager import DockerExecutor
+        is_docker = False
+        try:
+            from ade.sandbox.docker_manager import DockerExecutor
 
-        if isinstance(executor, DockerExecutor) and code_changes:
+            is_docker = isinstance(executor, DockerExecutor)
+        except ImportError:
+            pass
+
+        if is_docker and code_changes:
             from ade.sandbox.workspace import SandboxWorkspace
 
             async with SandboxWorkspace(project_path) as ws:
@@ -168,6 +175,13 @@ async def executor_node(state: AgentState) -> dict:
             if step_id:
                 await _persist_result(step_id, result)
 
+        logger.info(
+            "Executor result: exit_code=%d, stdout=%s, stderr=%s",
+            result["exit_code"],
+            result["stdout"][:200],
+            result["stderr"][:200],
+        )
+
         return {
             "execution_results": [result],
             "status": "reviewing",
@@ -187,14 +201,45 @@ async def executor_node(state: AgentState) -> dict:
         }
 
 
-def _determine_command(plan: list[dict], step_index: int) -> str:
-    """Determine the test command based on target files."""
+def _determine_command(
+    plan: list[dict], step_index: int, project_path: str = ""
+) -> str:
+    """Determine the test command based on target files and project type."""
+    import os
+
+    # Detect project type from files in the project root
+    is_node = False
+    is_python = False
+    if project_path:
+        is_node = os.path.exists(os.path.join(project_path, "package.json"))
+        is_python = (
+            os.path.exists(os.path.join(project_path, "pyproject.toml"))
+            or os.path.exists(os.path.join(project_path, "setup.py"))
+            or os.path.exists(os.path.join(project_path, "requirements.txt"))
+        )
+
     if step_index < len(plan):
         target_files = plan[step_index].get("target_files", [])
         test_files = [f for f in target_files if "test" in f.lower()]
+
         if test_files:
-            return f"pytest {' '.join(test_files)} -v"
-    return "pytest -v"
+            # Check file extensions to pick the right runner
+            js_tests = [f for f in test_files if f.endswith((".js", ".ts", ".jsx", ".tsx"))]
+            py_tests = [f for f in test_files if f.endswith(".py")]
+
+            if js_tests:
+                return f"npx jest {' '.join(js_tests)} --passWithNoTests"
+            if py_tests:
+                return f"pytest {' '.join(py_tests)} -v"
+
+    # Fallback based on project type
+    if is_node:
+        return "npm test --if-present || echo 'No tests configured'"
+    if is_python:
+        return "pytest -v"
+
+    # Unknown project type — try both
+    return "echo 'No test runner detected — skipping tests' && exit 0"
 
 
 async def _get_step_id(

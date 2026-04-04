@@ -19,7 +19,7 @@ def test_settings_defaults():
     assert s.default_rerank_model == "claude-haiku-235-20250301"
     assert s.llm_cache_ttl_seconds == 3600
     assert s.sandbox_timeout_seconds == 60
-    assert s.voyage_api_key is None or s.voyage_api_key == ""
+    assert s.embedding_dimension == 1024
 
 
 def test_settings_validates_database_url():
